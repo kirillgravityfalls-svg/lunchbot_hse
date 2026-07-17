@@ -8,13 +8,13 @@ from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 # ========== НАСТРОЙКИ ==========
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # токен из переменных Render
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не задан!")
 
 DB_NAME = "lunchbot.db"
 
-# ========== ВЕБ-СЕРВЕР ДЛЯ RENDER ==========
+# ========== ВЕБ-СЕРВЕР ==========
 app = Flask(__name__)
 
 @app.route('/')
@@ -29,7 +29,7 @@ def health_check():
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Кнопки для выбора корпуса
+# Кнопки
 campus_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="Покровка")],
@@ -59,9 +59,7 @@ def get_db():
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer(
-        "🍽 Привет! Я помогу тебе найти место для перекуса рядом с твоим корпусом.\n\n"
-        "Я показываю только кофейни, пекарни, магазины и киоски.\n"
-        "Без столовых!\n\n"
+        "🍽 Привет! Я помогу тебе найти место для перекуса.\n\n"
         "Выбери свой корпус:",
         reply_markup=campus_kb
     )
@@ -81,7 +79,7 @@ async def set_campus(message: types.Message):
     
     await message.answer(
         f"✅ Корпус выбран: {campus}\n\n"
-        "Теперь нажми «🍽 Что поесть?», чтобы посмотреть варианты.",
+        "Теперь нажми «🍽 Что поесть?»",
         reply_markup=main_kb
     )
 
@@ -108,14 +106,14 @@ async def get_food(message: types.Message):
     conn.close()
     
     if not places:
-        await message.answer("😕 Рядом с этим корпусом пока нет точек в базе.\nПопробуй позже.")
+        await message.answer("😕 Рядом с этим корпусом пока нет точек.")
         return
     
     answer = f"🍽 Лучшие места рядом с {campus}:\n\n"
     for place in places:
         answer += (
             f"🏪 {place['name']}\n"
-            f"⭐ {place['rating']} | {place['category']} | {place['walk_time']} мин пешком\n"
+            f"⭐ {place['rating']} | {place['category']} | {place['walk_time']} мин\n"
             f"💳 ~{place['avg_bill']} ₽\n"
             f"📍 {place['address']}\n\n"
         )
@@ -124,50 +122,35 @@ async def get_food(message: types.Message):
 
 @dp.message(lambda msg: msg.text == "📍 Сменить корпус")
 async def change_campus(message: types.Message):
-    await message.answer(
-        "Выбери свой корпус:",
-        reply_markup=campus_kb
-    )
+    await message.answer("Выбери свой корпус:", reply_markup=campus_kb)
 
 @dp.message(lambda msg: msg.text == "ℹ️ О боте")
 async def about(message: types.Message):
     await message.answer(
         "🍽 LunchBot для Лицея ВШЭ\n\n"
-        "📌 Помогает быстро найти место для перекуса\n"
-        "🚫 Не показывает столовые и буфеты\n"
-        "📍 Работает для 6 корпусов Лицея:\n"
-        "   • Покровка\n"
-        "   • Солянка\n"
-        "   • Колобовский\n"
-        "   • Лялин пер.\n"
-        "   • Трифоновская\n"
-        "   • Потаповский\n\n"
+        "📌 Помогает найти место для перекуса\n"
+        "🚫 Не показывает столовые\n"
+        "📍 6 корпусов Лицея\n\n"
         "Версия 1.0"
     )
 
 @dp.message()
 async def unknown(message: types.Message):
-    await message.answer(
-        "Я не понимаю эту команду.\n"
-        "Используй кнопки меню 👇"
-    )
+    await message.answer("Используй кнопки меню 👇")
 
+# ========== ЗАПУСК ==========
 async def run_bot():
     print("🚀 Бот запущен!")
     await dp.start_polling(bot)
 
-# ========== ЗАПУСК В ПОТОКЕ ==========
-def start_bot_thread():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_bot())
-
-# ========== ГЛАВНЫЙ ЗАПУСК ==========
-if __name__ == "__main__":
-    # Запускаем бота в отдельном потоке
-    bot_thread = Thread(target=start_bot_thread)
-    bot_thread.start()
-    
-    # Запускаем Flask для Render
-    port = int(os.environ.get("PORT", 5000))
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
+if __name__ == "__main__":
+    # Запускаем Flask в отдельном потоке
+    flask_thread = Thread(target=run_flask)
+    flask_thread.start()
+    
+    # Запускаем бота в основном потоке (главное изменение!)
+    asyncio.run(run_bot())
